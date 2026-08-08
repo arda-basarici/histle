@@ -1,0 +1,32 @@
+# Secrets — never in history
+.env
+.env.*
+*.key
+*.pem
+secrets*
+
+# Working files — disposable by design
+WHITEBOARD.md
+logs/
+
+# Data pipeline intermediates (raw harvests regenerate from the APIs;
+# the curated dataset itself IS committed — the manual pass makes it non-regenerable)
+data/raw/
+data/cache/
+
+# Python
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node / frontend tooling (if it ever appears)
+node_modules/
+
+# OS noise
+Thumbs.db
+.DS_Store
+
+# Claude
+CLAUDE.md

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Secret scan on every commit — blocks the commit if staged changes contain
+# anything token-shaped. Fail-closed: a missing scanner blocks too (this repo
+# sits next to ~/.claude material; a silent pass is worse than a loud stop).
+#
+# One-time per clone: git config core.hooksPath .githooks
+# Scanner: gitleaks (winget install Gitleaks.Gitleaks)
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks not found on PATH — refusing to commit unscanned." >&2
+  echo "Install: winget install Gitleaks.Gitleaks (then restart the shell)." >&2
+  exit 1
+fi
+
+exec gitleaks git --pre-commit --staged --redact --verbose
