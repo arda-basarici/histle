@@ -32,9 +32,11 @@ probes, and the game blurs into the existing year-guesser genre. Each guess ther
 returns:
 
 - **time**: direction (earlier/later) plus a bucketed distance — buckets roughly
-  logarithmic (0 · ≤10 · ≤50 · ≤100 · ≤500 · >500 years) so early guesses stay
-  informative and the endgame stays tight; direction is included because distance
-  alone doubles the search space without adding fun;
+  logarithmic (0 · ≤5 · ≤15 · ≤40 · ≤100 · ≤250 · ≤600 · >600 years) so early guesses
+  stay informative and the endgame stays tight; the bands are narrow at the recent end
+  because the answer pool skews modern, and a wide 100–500 band said almost nothing
+  about a 20th-century answer; direction is included because distance alone doubles the
+  search space without adding fun;
 - **region**: same region / same continent / different;
 - **category**: match or no match, over a coarse taxonomy (6–8 buckets: war,
   politics, science-technology, culture, disaster, exploration, …) assigned during

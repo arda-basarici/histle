@@ -1,0 +1,455 @@
+/* histle — skeleton styling.
+   Deliberately plain: this is the structure a later polish pass restyles. Everything
+   colour-ish is a custom property, so a theme swap touches this block only. */
+
+:root {
+  /* feedback palette */
+  --c-green: #3f9a52;
+  --c-green-soft: #e6f2e8;
+  --c-yellow: #c99a2e;
+  --c-yellow-soft: #f8f0dc;
+  --c-grey: #9aa0a6;
+  --c-grey-soft: #eef0f2;
+
+  /* surfaces + text */
+  --c-bg: #fbfbf9;
+  --c-surface: #ffffff;
+  --c-border: #e2e2dd;
+  --c-text: #23241f;
+  --c-text-muted: #6b6d66;
+  --c-accent: #23241f;
+  --c-focus: #4a6fa5;
+
+  --radius: 8px;
+  --gap: 0.75rem;
+  --column: 560px;
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  padding: 1.25rem 1rem 3rem;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+.shell {
+  max-width: var(--column);
+  margin: 0 auto;
+}
+
+:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ masthead */
+
+.masthead {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.masthead__title {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.masthead__day {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: var(--c-text-muted);
+  vertical-align: 0.25em;
+  font-variant-numeric: tabular-nums;
+}
+
+.masthead__tagline {
+  margin: 0.35rem auto 0;
+  max-width: 34rem;
+  color: var(--c-text-muted);
+  font-size: 0.9rem;
+}
+
+/* ------------------------------------------------------------------ guessbox */
+
+.guessbox {
+  margin-bottom: 1.25rem;
+}
+
+.guessbox__field {
+  position: relative;
+}
+
+.guessbox__label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.guessbox__input {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  color: inherit;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+}
+
+.guessbox__input:disabled {
+  background: var(--c-grey-soft);
+  color: var(--c-text-muted);
+}
+
+.guessbox__status {
+  min-height: 1.2em;
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--c-text-muted);
+}
+
+.guessbox__counter {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-muted);
+}
+
+/* --------------------------------------------------------------- suggestions */
+
+.suggestions {
+  position: absolute;
+  z-index: 10;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  max-height: 19rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 8%);
+}
+
+.suggestion {
+  padding: 0.45rem 0.55rem;
+  border-radius: calc(var(--radius) - 3px);
+  cursor: pointer;
+}
+
+.suggestion--active,
+.suggestion:hover {
+  background: var(--c-grey-soft);
+}
+
+.suggestion__name {
+  display: block;
+}
+
+.suggestion__via {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--c-text-muted);
+}
+
+/* Only present on same-name collisions; kept quiet so it reads as a disambiguator
+   rather than as part of the event's name. */
+.suggestion__century {
+  color: var(--c-text-muted);
+  font-size: 0.85em;
+}
+
+/* -------------------------------------------------------------- guess rows */
+
+.guess-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.guess {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.65rem;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-left: 5px solid var(--c-grey);
+  border-radius: var(--radius);
+}
+
+.guess[data-closeness="green"] {
+  border-left-color: var(--c-green);
+}
+
+.guess[data-closeness="yellow"] {
+  border-left-color: var(--c-yellow);
+}
+
+.guess--win {
+  background: var(--c-green-soft);
+  border-color: var(--c-green);
+}
+
+.guess__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.guess__name {
+  margin: 0 0 0.45rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.guess__year {
+  font-weight: 400;
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.guess__badge {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-surface);
+  background: var(--c-green);
+  border-radius: 999px;
+  vertical-align: 0.1em;
+}
+
+/* thumbnail slot — fixed box so rows align whether or not an image exists */
+.thumb {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--c-grey-soft);
+}
+
+.thumb--empty {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--c-grey-soft),
+    var(--c-grey-soft) 6px,
+    #e5e7e9 6px,
+    #e5e7e9 12px
+  );
+}
+
+.thumb__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ------------------------------------------------------------ feedback cells */
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.cell {
+  min-width: 0;
+  padding: 0.3rem 0.45rem;
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--c-grey-soft);
+}
+
+.cell__label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-muted);
+}
+
+/* Category names run long ("exploration & discovery"); wrap rather than truncate so a
+   narrow column never hides which axis matched. */
+.cell__value {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.cell[data-state="same"],
+.cell[data-state="green"] {
+  background: var(--c-green-soft);
+  color: var(--c-green);
+}
+
+.cell[data-state="continent"],
+.cell[data-state="yellow"] {
+  background: var(--c-yellow-soft);
+  color: var(--c-yellow);
+}
+
+.cell[data-state="same"] .cell__label,
+.cell[data-state="continent"] .cell__label,
+.cell[data-state="green"] .cell__label,
+.cell[data-state="yellow"] .cell__label {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* ------------------------------------------------------------------- outcome */
+
+.outcome {
+  margin-bottom: 1.25rem;
+  padding: 0.9rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+}
+
+.outcome--win {
+  background: var(--c-green-soft);
+  border-color: var(--c-green);
+}
+
+.outcome__title {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.outcome__line {
+  margin: 0;
+}
+
+.outcome__stats {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-muted);
+}
+
+.outcome__share {
+  margin-top: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--c-surface);
+  background: var(--c-accent);
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.outcome__share:hover {
+  opacity: 0.88;
+}
+
+.reveal {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.reveal .thumb {
+  width: 72px;
+  height: 72px;
+}
+
+.reveal__text {
+  min-width: 0;
+}
+
+.reveal__name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.reveal__year {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--c-text-muted);
+}
+
+.reveal__blurb {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+}
+
+/* -------------------------------------------------------------------- legend */
+
+.legend {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--c-border);
+  font-size: 0.8rem;
+  color: var(--c-text-muted);
+}
+
+.legend__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.legend__list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.6rem;
+  margin: 0;
+}
+
+.legend__list dt {
+  font-weight: 600;
+  color: var(--c-text);
+  white-space: nowrap;
+}
+
+.legend__list dd {
+  margin: 0;
+}
+
+.legend__note {
+  margin: 0.7rem 0 0;
+}
+
+/* ------------------------------------------------------------- wider screens */
+
+@media (min-width: 480px) {
+  .cells {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .masthead__title {
+    font-size: 2.4rem;
+  }
+}

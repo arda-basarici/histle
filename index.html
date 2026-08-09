@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>histle — guess the historical event</title>
+  <meta name="description" content="A daily game: guess the hidden historical event from time, region and category feedback.">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="shell">
+
+    <header class="masthead">
+      <h1 class="masthead__title">histle <span id="day-number" class="masthead__day"></span></h1>
+      <p class="masthead__tagline">
+        Guess the hidden historical event. Every wrong guess tells you how far off
+        you are — in years, continents, and kind.
+      </p>
+    </header>
+
+    <main>
+      <!-- Guessing area. The combobox is the only way to enter a guess: free text is
+           deliberately not accepted, so every guess resolves to a known event id. -->
+      <section class="guessbox" aria-label="Make a guess">
+        <div class="guessbox__field">
+          <label class="guessbox__label" for="guess-input">Your guess</label>
+          <input
+            id="guess-input"
+            class="guessbox__input"
+            type="text"
+            placeholder="Start typing an event…"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            role="combobox"
+            aria-expanded="false"
+            aria-controls="suggestions"
+            aria-autocomplete="list">
+          <ul id="suggestions" class="suggestions" role="listbox" aria-label="Matching events" hidden></ul>
+        </div>
+        <p id="guess-status" class="guessbox__status" role="status" aria-live="polite"></p>
+        <p id="guess-counter" class="guessbox__counter"></p>
+      </section>
+
+      <!-- Outcome panel: win banner, or the reveal on a loss. Empty while playing. -->
+      <section id="outcome" class="outcome" aria-live="polite" hidden></section>
+
+      <!-- Guess history, newest first. -->
+      <ol id="guess-list" class="guess-list" aria-label="Your guesses"></ol>
+    </main>
+
+    <footer class="legend">
+      <h2 class="legend__title">How to read a guess</h2>
+      <dl class="legend__list">
+        <dt>▲ / ▼</dt>
+        <dd>The answer happened <em>after</em> / <em>before</em> your guess.</dd>
+        <dt>Years</dt>
+        <dd>How far apart the two events are, as a band.</dd>
+        <dt>✓ ~ ✗ ?</dt>
+        <dd>Region and category: match, near, miss, unknown.</dd>
+        <dt>Border</dt>
+        <dd>Overall closeness — green, amber, grey.</dd>
+      </dl>
+      <p class="legend__note">Six guesses. Pick every guess from the suggestion list.</p>
+    </footer>
+
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
