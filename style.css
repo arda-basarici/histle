@@ -338,6 +338,18 @@ body {
   color: var(--c-text-muted);
 }
 
+/* The unit, not the value: small, lighter and set apart by a hair-space of margin so the
+   number keeps the weight. It inherits the score's colour rather than muting to grey,
+   because a green "97" with a grey "pts" reads as two things rather than one. */
+.guess__score-unit {
+  margin-left: 0.15em;
+  font-size: 0.62em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 .guess[data-closeness="green"] .guess__score {
   color: var(--c-green);
 }

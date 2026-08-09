@@ -173,7 +173,7 @@ const buildFeedbackCells = (feedback, guessEvent) => {
   const closeness = CLOSENESS_CELL[feedback.closeness];
   const cells = element('div', 'cells');
   cells.append(
-    buildCell('Year', `${arrow.symbol} ${feedback.yearBucket}`, {
+    buildCell('Year', `${arrow.symbol} ${feedback.yearLabel}`, {
       state: feedback.yearDirection,
       title: `${arrow.title} — ${formatYear(guessEvent.year)}`,
     }),
@@ -211,9 +211,14 @@ const buildGuessRow = ({ event, name, feedback, isAnswer }) => {
   // The score is a summary of the four cells below it and adds nothing to them (see
   // SCORING's leak-safety note) — it sits on the row so a player can rank their probes
   // at a glance instead of comparing four axes by eye.
+  //
+  // The "pts" suffix is there because a bare number in a corner reads as anything —
+  // a year, a rank, a count of something. It is set small and quiet so the number stays
+  // the thing the eye lands on and the unit only answers the question it raises.
   const score = scoreFor(feedback, { isAnswer });
   const scoreNode = element('span', 'guess__score', String(score));
-  scoreNode.title = `${score} out of 100 — how close this guess was`;
+  scoreNode.append(element('span', 'guess__score-unit', 'pts'));
+  scoreNode.title = 'closeness score — 100 = the answer';
 
   const head = element('div', 'guess__head');
   head.append(heading, scoreNode);

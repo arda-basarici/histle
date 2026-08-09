@@ -33,9 +33,12 @@ probes, and the game blurs into the existing year-guesser genre. Each guess retu
 - **time**: direction (earlier/later) plus a bucketed distance — bands 0 · ≤5 · ≤15 ·
   ≤40 · ≤100 · ≤250 · ≤600 · >600 years, dense at the recent end because the answer
   pool skews modern (a wide 100–500 band said almost nothing about a 20th-century
-  answer). Buckets are load-bearing ambiguity: direction plus an *exact* distance
-  would solve the answer's year in one guess, so no displayed signal may be finer
-  than its band.
+  answer). The information schedule is **coarse at range, exact up close**: direction
+  plus an exact distance from far away would solve the answer's year in one guess, so
+  distant bands stay coarse — but at ≤10 years the cell shows the exact distance,
+  because the band already confines the year and exactness there only speeds an
+  endgame the player has won on the time axis; naming the year's event remains the
+  test. The score always derives from band bases, so no finer back-channel opens.
 - **region**: same / different / honest "multi" for events spanning continents (a
   world war has no continent — saying so is information, a "?" is a shrug) / unknown
   where the data has none.

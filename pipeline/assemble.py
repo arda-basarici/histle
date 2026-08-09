@@ -20,9 +20,9 @@ signature of an entity that merely got mentioned: beer's -3500 against a blurb a
 in 1516. Between those extremes, gaps of 11–100 years are kept and flagged for a human, since
 that band holds both genuine disagreement about ancient datings and real mistakes.
 
-Boundary. Input is six things on disk; output is three files, one backup and a printed
-report. No network. Everything derived from the raw cache is regenerable, so this script can
-be re-run at will — but `data/curation.csv` is also an *input* now, and that is the one thing
+Boundary. Input is six things on disk, plus the optional manual-thumbnail cache; output is
+three files, one backup and a printed report. No network. Everything derived from the raw
+cache is regenerable, so this script can be re-run at will — but `data/curation.csv` is also an *input* now, and that is the one thing
 here that is not reproducible from the caches. A run reads the existing sheet, keeps every
 cell a human deviated from its prefill, regenerates the sheet under the current taxonomy, and
 writes the kept cells back onto it; the previous sheet is copied to
@@ -31,10 +31,34 @@ would otherwise destroy the only copy of work that cannot be recomputed.
 
 What the sheet decides. The `famous` column is the answer pool: `y` makes an event a
 `famous_candidate` in the core file, `n` removes it, `category_final` overrides the prefilled
-kind and sets `category_reviewed`, and a `notes` cell containing "drop" deletes the event from
-both output files. The top band of the sheet ships prefilled `y`, so the answer pool is a few
-hundred recognisable events from the first run rather than every one of the 2596 items that
-merely cleared the sitelink bar — a prefill a human can veto, not a guess the game hides.
+kind and sets `category_reviewed`, `region_final` overrides the resolved region, and a `notes`
+cell containing "drop" deletes the event from both output files. The top band of the sheet
+ships prefilled `y`, so the answer pool is a few hundred recognisable events from the first run
+rather than every one of the 2596 items that merely cleared the sitelink bar — a prefill a
+human can veto, not a guess the game hides.
+
+What the answer pool is for, and the rule that follows from it. A hidden answer has to be a
+*happening* — something that occurred on a day, which a player can triangulate in time. A
+magazine, a television series, an ideology or an art movement is none of those; it is an entity
+wearing its founding year, and Wikidata dates it exactly as it dates a battle. Those items sail
+through every filter above — the date is real, the class is not a person or a country, the
+sitelinks are enormous — and land near the top of the popularity ranking, which is precisely
+where the sheet prefills `famous`. So the first review of the sheet found Playboy, Miss
+Universe, Time, Star Trek, The Simpsons, modernism and Nazism sitting in the answer pool. The
+`ENTITY_START_CLASSES` rule flags them `entity_start` and takes them out of the *prefill* only:
+they stay in the guessable pool, where a player probing "The Simpsons, 1989" is making a
+perfectly good move on the timeline, and a curator who thinks one of them really is an event
+can still write "y". The band backfills from the next most popular real event, so excluding
+them costs the answer pool nothing.
+
+Why the sheet gets a region column at all. The region chain below is four steps of inference
+over Wikidata, and it is blind in exactly the place the game cares most about: a famous war
+often carries no location claim of any kind. The Gulf War has no country (P17), no continent
+(P30) and no coordinates (P625), so every step of the chain declines in turn and the event
+ships with a null region — an answer whose most obvious feedback axis says nothing. No amount
+of chain work fixes that, because the facts are absent upstream. A human reviewing the answer
+pool already knows the Gulf War happened in Asia, and is already looking at the row, so the
+cheapest place to put the knowledge is the column next to the one that came out empty.
 
 Manual additions. The "On This Day" feed represents some events only through their artifact:
 there is a page for the printing press, none for its invention. `manual_events.draft.json`
@@ -77,11 +101,19 @@ Gotchas worth knowing before editing:
   Russia is transcontinental, not because the battle was — 377 of the 530 such items are
   Russian, Soviet or Turkish. Those fall through to the country table, which resolves them to
   the continent of the state's core, and Stalingrad comes out Europe.
-- Thumbnails exist in exactly one place: the raw per-day feeds. Neither Wikidata nor the
-  candidate file carries an image, so the feeds are scanned once here and reduced to a
-  QID -> URL map. An entity sighted on several days can have several thumbnails; the sighting
-  with the lowest `page_index` wins, the same centrality tiebreak the harvest used to pick a
-  blurb, so the picture comes from the day the feed treated the entity as the subject.
+  A `region_final` cell in the curation sheet sits above the whole chain: it replaces whatever
+  the chain decided, records `curation sheet` as the source, and clears the `region_missing` /
+  `region_boxed` flags, because those describe how the *chain* arrived and it no longer did.
+- Thumbnails for harvested events exist in exactly one place: the raw per-day feeds. Neither
+  Wikidata nor the candidate file carries an image, so the feeds are scanned once here and
+  reduced to a QID -> URL map. An entity sighted on several days can have several thumbnails;
+  the sighting with the lowest `page_index` wins, the same centrality tiebreak the harvest used
+  to pick a blurb, so the picture comes from the day the feed treated the entity as the subject.
+  Manual entries were never in a feed — that is why they are manual — so theirs come from
+  `data/raw/manual_thumbs.json`, which `pipeline/thumbs.py` fills by asking Wikipedia about each
+  draft entry's `wiki_title`. That file is optional here: absent, the manual rows ship without
+  pictures and everything else is unchanged, because a network call has no business inside a
+  stage whose boundary claim is "files in, files out".
 - The category prefill resolves in three passes — an exact P31 class map, then keyword
   patterns over the P31 class names, then the same patterns over the label — and an item
   voting for several kinds is settled by a fixed precedence, not by whichever class sorted
@@ -131,6 +163,7 @@ ENRICHED_PATH = REPO_ROOT / "data" / "raw" / "enriched.json"
 AUGMENTED_PATH = REPO_ROOT / "data" / "raw" / "augmented.json"
 ONTHISDAY_DIR = REPO_ROOT / "data" / "raw" / "onthisday"
 MANUAL_PATH = REPO_ROOT / "data" / "manual_events.draft.json"
+MANUAL_THUMBS_PATH = REPO_ROOT / "data" / "raw" / "manual_thumbs.json"
 
 CORE_PATH = REPO_ROOT / "data" / "events.core.json"
 LABELS_PATH = REPO_ROOT / "data" / "labels.en.json"
@@ -146,6 +179,8 @@ REVIEW_CANDIDATE_MIN_SITELINKS = 25
 CURATION_PREFILLED_FAMOUS = 400
 TOP_POPULARITY_SHOWN = 15
 DROP_EXAMPLES_SHOWN = 3
+PREFILL_TAIL_SHOWN = 8  # where the prefilled band actually ends — the cutoff, read as events
+ENTITY_START_EXAMPLES_SHOWN = 15
 
 # Manual additions have no sitelinks, so their popularity is a placement decision rather than a
 # measurement. 60 seats them above the long tail (the pool's median candidate) and below the
@@ -232,6 +267,87 @@ P31_EVENT_RESCUE = frozenset(
         "peace treaty",
     }
 )
+
+# Classes whose Wikidata date is an *inception*, not a happening: the day a magazine was
+# founded, a movement was named, a series first aired. They pass every filter above — the date
+# is real, the class is not on the blocklist, the sitelinks are enormous — and then read as an
+# answer nobody can guess, because the thing they name is not something that occurred on a day.
+# See the module docstring on what the answer pool is for.
+ENTITY_START_CLASSES = frozenset(
+    {
+        "television series",
+        "animated television series",
+        "television program",
+        "media franchise",
+        "magazine",
+        "weekly magazine",
+        "newspaper",
+        "daily newspaper",
+        "periodical",
+        "website",
+        "ideology",
+        "political ideology",
+        "art movement",
+        "literary movement",
+        "cultural movement",
+        "beauty pageant",
+        "sports season",
+        "recurring sporting event",
+        "award",
+        "literary award",
+    }
+)
+
+# Serial editions: real events, unlike the entity starts, but interchangeable instances of a
+# recurring template — the 1956 Summer Olympics happened, yet "which edition?" is an arbitrary
+# answer. Same treatment as entity starts: excluded from the famous prefill, kept guessable
+# (editions are excellent time-probes — casual players know Olympic years), and a curator's
+# explicit "y" still wins for the rare edition that transcends its series (Berlin 1936).
+SERIAL_EVENT_CLASSES = frozenset(
+    {
+        "election",
+        "public election",
+        "presidential election",
+        "United States presidential election",
+        "general election",
+        "legislative election",
+        "Olympic Games edition",
+        "Summer Olympic Games edition",
+        "Winter Olympic Games edition",
+        "Olympic sporting event",
+        "recurring event edition",
+        "recurring sporting event edition",
+        "international sporting event",
+        "sports competition",
+        "award ceremony",
+        "Academy Awards ceremony",
+        "Eurovision Song Contest edition",
+        "FIFA World Cup final",
+        "Super Bowl",
+        "American football game",
+        "association football club match",
+        "international association football match",
+        "boxing match",
+    }
+)
+
+# The name signature of a serial edition — "2006 FIFA World Cup", "73rd Academy Awards",
+# "1948 United States presidential election" — is a leading year or ordinal. Alone it would
+# also catch legitimate answers ("1973 Chilean coup d'état", "2015 Nepal earthquake"), so it
+# only fires together with a serial keyword. Both halves must agree; the class set above
+# needs no name evidence.
+SERIAL_NAME_PREFIX = re.compile(r"^(\d{3,4}(\S*)?|\d+(st|nd|rd|th))\s")
+SERIAL_NAME_KEYWORD = re.compile(
+    r"\b(election|olympics?|games|cup|award|awards|championship|grand prix|contest"
+    r"|pageant|super bowl|prize|tour de france)\b",
+    re.IGNORECASE,
+)
+
+# The flags that keep an event out of the automatic famous prefill (a human "y" still wins).
+# One tuple, referenced by the band builder AND the read-back's prefill reconstruction — the
+# coupling between those two is load-bearing (see prefilled_famous_defaults), so the flag
+# list they share lives in exactly one place.
+PREFILL_EXCLUDED_FLAGS = ("entity_start", "serial_event")
 
 BATTLE = "battle & war"
 REVOLUTION = "revolution & uprising"
@@ -514,6 +630,16 @@ CONTINENT_ALIASES = {
 # missing value — a positive claim the game reads as "no region signal here".
 REGION_MULTI = "multi"
 
+# Every value the region field may hold besides null, in one place: the vocabulary the output
+# validation enforces, the manual draft is checked against, and a `region_final` cell must
+# speak. Three checks reading one tuple is what keeps the spreadsheet, the draft and the
+# shipped file from drifting apart.
+LEGAL_REGIONS = (*REGION_CANONICAL, REGION_MULTI)
+
+# Flags that describe how the region *chain* arrived at its answer. A human override replaces
+# the chain, so they stop being true of the row and are cleared with it.
+REGION_CHAIN_FLAGS = frozenset({"region_missing", "region_boxed"})
+
 # The P31 class that makes an event multi-continent by definition, whatever its country list
 # happens to name.
 WORLD_WAR_CLASS = "world war"
@@ -771,6 +897,7 @@ CURATION_COLUMNS = (
     "category_auto",
     "tags_auto",
     "region",
+    "region_final",
     "country",
     "popularity",
     "flags",
@@ -949,6 +1076,30 @@ def is_blocked_type(instance_of: list[str]) -> bool:
     if not classes & P31_BLOCKLIST:
         return False
     return not (classes & P31_EVENT_RESCUE)
+
+
+def is_entity_start(instance_of: list[str]) -> bool:
+    """Whether this item's date is the founding of a thing rather than the occurrence of an
+    event. Same shape as `is_blocked_type`, and deliberately so: an event-shaped P31 alongside
+    the entity class wins, because "media franchise, war" is a war that spawned a franchise.
+    Unlike the blocklist this decides nothing about pool membership — the item stays guessable
+    (see the module docstring); it only stops being prefilled as an *answer*."""
+    classes = set(instance_of)
+    if not classes & ENTITY_START_CLASSES:
+        return False
+    return not (classes & P31_EVENT_RESCUE)
+
+
+def is_serial_event(instance_of: list[str], name: str) -> bool:
+    """Whether this event is an interchangeable edition of a recurring series — an election,
+    a games edition, an award night. Two independent detectors: a serial P31 class decides
+    alone; the name signature (leading year or ordinal) only decides together with a serial
+    keyword, because year-prefixed names are also how disasters and coups are titled. No
+    rescue-class override — a battle is never typed as an election, so there is no umbrella
+    ambiguity to rescue from."""
+    if set(instance_of) & SERIAL_EVENT_CLASSES:
+        return True
+    return bool(SERIAL_NAME_PREFIX.match(name or "") and SERIAL_NAME_KEYWORD.search(name or ""))
 
 
 def select_pool(inputs: RawInputs) -> Selection:
@@ -1159,6 +1310,10 @@ def assemble_event(qid: str, inputs: RawInputs, gap_flagged: bool) -> AssembledE
 
     flags = [*(["gap_review"] if gap_flagged else []), *(["category_guess"] if guessed else [])]
     flags.extend(region_flags)
+    if is_entity_start(record["instance_of"]):
+        flags.append("entity_start")
+    if is_serial_event(record["instance_of"], record["label"]):
+        flags.append("serial_event")
 
     return AssembledEvent(
         qid=qid,
@@ -1251,13 +1406,21 @@ def find_overlap(entry: dict[str, Any], events: list[AssembledEvent]) -> Assembl
     return None
 
 
-def manual_event(entry: dict[str, Any], index: int) -> AssembledEvent:
+def manual_event(
+    entry: dict[str, Any], index: int, thumbs: dict[str, str | None]
+) -> AssembledEvent:
     """One draft entry as a finished event. Ids are `M` plus the entry's 1-based position in the
     file, so an id is stable as long as the file is only appended to — reordering the draft
     renumbers, which is why the draft is a curation artifact and not a scratch file. Everything
-    the harvest would have supplied is honestly absent: no thumbnail, no coordinates, no country,
-    a fixed popularity, and `manual: true` on the core record so nothing downstream mistakes a
-    hand-written year for a Wikidata one."""
+    else the harvest would have supplied is honestly absent: no coordinates, no country, a fixed
+    popularity, and `manual: true` on the core record so nothing downstream mistakes a
+    hand-written year for a Wikidata one.
+
+    The thumbnail is the one exception, and it arrives from the side: `thumbs.py` asks the
+    pageimages API for each draft entry's `wiki_title` and leaves a cache, which this reads by
+    that same key. A missing cache, a missing key and a page with no picture all mean the same
+    thing here — no thumbnail — because the row renders identically either way and the reason
+    belongs in that stage's report, not in this field."""
     category = entry["category"]
     category = CATEGORY_ALIASES.get(category, category)
     if category not in CATEGORIES:
@@ -1267,10 +1430,10 @@ def manual_event(entry: dict[str, Any], index: int) -> AssembledEvent:
         )
 
     region = entry.get("region")
-    if region is not None and region not in REGION_CANONICAL and region != REGION_MULTI:
+    if region is not None and region not in LEGAL_REGIONS:
         raise RuntimeError(
             f"manual entry {entry['name']!r} has region {region!r}; "
-            f"expected null, {REGION_MULTI!r} or one of {list(REGION_CANONICAL)}"
+            f"expected null or one of {list(LEGAL_REGIONS)}"
         )
 
     return AssembledEvent(
@@ -1287,7 +1450,7 @@ def manual_event(entry: dict[str, Any], index: int) -> AssembledEvent:
         review_candidate=True,
         famous_candidate=False,
         popularity=MANUAL_POPULARITY,
-        thumb=None,
+        thumb=thumbs.get(entry.get("wiki_title") or ""),
         name=entry["name"],
         aliases=list(entry.get("aliases") or []),
         blurb="",
@@ -1306,6 +1469,16 @@ class ManualMerge:
     skipped: list[tuple[str, str]]
 
 
+def load_manual_thumbs() -> dict[str, str | None]:
+    """The `thumbs.py` cache, keyed by the draft's own `wiki_title`, or empty when it has never
+    been run. Empty is a legitimate state and not an error: the cache is a side stage over the
+    network, and a dataset assembled without it is correct, just picture-less in fifty rows."""
+    if not MANUAL_THUMBS_PATH.is_file():
+        return {}
+    with MANUAL_THUMBS_PATH.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def merge_manual_events(events: list[AssembledEvent]) -> ManualMerge:
     """The draft's entries folded into the assembled pool, minus the duplicates.
 
@@ -1318,6 +1491,7 @@ def merge_manual_events(events: list[AssembledEvent]) -> ManualMerge:
         )
     with MANUAL_PATH.open(encoding="utf-8") as handle:
         entries = json.load(handle).get("events") or []
+    thumbs = load_manual_thumbs()
 
     pool = list(events)
     merged: list[AssembledEvent] = []
@@ -1327,7 +1501,7 @@ def merge_manual_events(events: list[AssembledEvent]) -> ManualMerge:
         if match is not None:
             skipped.append((entry["name"], f"{match.qid} {match.name} ({match.year})"))
             continue
-        event = manual_event(entry, index)
+        event = manual_event(entry, index, thumbs)
         pool.append(event)
         merged.append(event)
     return ManualMerge(merged=merged, skipped=skipped)
@@ -1394,11 +1568,12 @@ def write_labels(events: list[AssembledEvent]) -> None:
 
 @dataclass
 class CurationEdit:
-    """One row a human changed, keyed by qid. Only the three writable columns are carried: the
+    """One row a human changed, keyed by qid. Only the four writable columns are carried: the
     rest of the sheet is derived and a run regenerates it."""
 
     famous: str
     category_final: str
+    region_final: str
     notes: str
 
 
@@ -1426,31 +1601,50 @@ def back_up_curation() -> Path | None:
     return backup
 
 
-def prefilled_famous_default(row_index: int, qid: str) -> str:
-    """What the `famous` cell of this row held when the sheet was written.
+def prefilled_famous_defaults(rows: list[dict[str, Any]]) -> list[str]:
+    """What each row's `famous` cell held when the sheet was written, in row order.
 
-    The sheet ships ranked, most popular first, with the top band prefilled and every manual
-    addition prefilled wherever it landed — so a row's default is a function of its position and
-    its id, and nothing else. Reconstructing it is what lets the read-back tell a curator's "y"
-    from a prefill's "y", which the cell itself cannot say.
+    Reconstructing the prefill is what lets the read-back tell a curator's "y" from a prefill's
+    "y", which the cell itself cannot say. The sheet ships ranked, most popular first, and the
+    band is filled from the top by *skipping* entity-start rows, so a row's default is no longer
+    a function of its position: the four hundredth "y" can sit at row 438. The reconstruction
+    therefore walks the sheet the way `prefill_band` walks the ranking — counting only the rows
+    whose `flags` cell lacks `entity_start` — and gives every manual row a "y" wherever it
+    landed. The sheet carries its own flags column precisely so this is readable back.
 
-    This must stay in step with `prefilled_famous_ids`, and the coupling is load-bearing in a
-    way that bites quietly: if this function is stricter than what the sheet writes, every run
-    reads its own prefills back as human edits and freezes them, and the sheet stops tracking
-    the data. That is not hypothetical — it happened, to the manual rows, before this signature
-    took the qid."""
-    manual = qid.startswith("M")
-    return "y" if row_index < CURATION_PREFILLED_FAMOUS or manual else ""
+    This must stay in step with `prefill_band`, and the coupling is load-bearing in a way that
+    bites quietly: if this function is stricter than what the sheet writes, every run reads its
+    own prefills back as human edits and freezes them, and the sheet stops tracking the data.
+    That is not hypothetical — it has happened twice, to the manual rows before this took the
+    qid, and to the entity-start rows before it took the whole sheet.
+
+    One transition is not handled and cannot be: a sheet written under an *older* prefill rule
+    reads its stale prefills as human judgements. That is the honest failure — the run cannot
+    tell a cell it would not have written from one a person typed — and it resolves itself
+    after one clean run, which is why the backup exists."""
+    defaults: list[str] = []
+    eligible_seen = 0
+    for row in rows:
+        row_flags = (row.get("flags") or "").split(";")
+        excluded = any(flag in row_flags for flag in PREFILL_EXCLUDED_FLAGS)
+        in_band = not excluded and eligible_seen < CURATION_PREFILLED_FAMOUS
+        if not excluded:
+            eligible_seen += 1
+        defaults.append("y" if in_band or row["qid"].startswith("M") else "")
+    return defaults
 
 
 def read_curation() -> CurationReadBack:
     """The previous sheet's human edits, keyed by qid.
 
     A cell counts as an edit when it differs from what this script would have written there:
-    any non-empty `category_final` or `notes`, or a `famous` value that is not the prefill its
-    row position implies. Read with `utf-8-sig` because the sheet is written with a BOM for
-    Excel's sake and Excel writes one back; a plain `utf-8` read would leave the BOM glued to
-    the first column name and silently find no qids at all."""
+    any non-empty `category_final`, `region_final` or `notes`, or a `famous` value that is not
+    the prefill its row position implies. Read with `utf-8-sig` because the sheet is written
+    with a BOM for Excel's sake and Excel writes one back; a plain `utf-8` read would leave the
+    BOM glued to the first column name and silently find no qids at all.
+
+    Columns are read with `.get`, so a sheet written before a column existed still reads: the
+    missing cell comes back empty, which is exactly what "the human wrote nothing here" means."""
     backup = back_up_curation()
     if backup is None:
         return CurationReadBack(rows_read=0, edits={}, backup_path=None)
@@ -1459,18 +1653,24 @@ def read_curation() -> CurationReadBack:
     with CURATION_PATH.open(encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
 
-    for index, row in enumerate(rows):
+    defaults = prefilled_famous_defaults(rows)
+    for row, default_famous in zip(rows, defaults):
         famous = (row.get("famous") or "").strip()
         category_final = (row.get("category_final") or "").strip()
+        region_final = (row.get("region_final") or "").strip()
         notes = (row.get("notes") or "").strip()
         if (
-            famous == prefilled_famous_default(index, row["qid"])
+            famous == default_famous
             and not category_final
+            and not region_final
             and not notes
         ):
             continue
         edits[row["qid"]] = CurationEdit(
-            famous=famous, category_final=category_final, notes=notes
+            famous=famous,
+            category_final=category_final,
+            region_final=region_final,
+            notes=notes,
         )
 
     return CurationReadBack(rows_read=len(rows), edits=edits, backup_path=backup)
@@ -1486,24 +1686,58 @@ class CurationOutcome:
     famous_from_human: int
     unfamous_from_human: int
     categories_overridden: int
+    regions_overridden: int
+    regions_filled_from_null: int
     edits_matched: int
     edits_unmatched: list[str]
 
 
-def prefilled_famous_ids(events: list[AssembledEvent]) -> set[str]:
-    """The ids whose `famous` cell ships "y".
+@dataclass
+class PrefillBand:
+    """The `famous` prefill and the evidence for it: which ids ship "y", which popular events
+    the entity-start rule pushed out of the band, and the least popular events that made it in.
+    The tail is the part worth reading — it is where the band's cutoff actually lands, and the
+    only honest way to see whether 400 is still the right number."""
 
-    Two groups. The top band by popularity, which is the sheet's whole ergonomic argument — a
-    reviewer should spend their attention on the boundary, not on confirming that the French
-    Revolution is famous. And every manual addition, unconditionally: those entries exist
-    *because* they are civilizational icons the harvest missed, and their popularity is a
-    placeholder that would rank them out of the band on a technicality."""
+    ids: set[str]
+    displaced: list[AssembledEvent]
+    tail: list[AssembledEvent]
+
+
+def prefill_band(events: list[AssembledEvent]) -> PrefillBand:
+    """The ids whose `famous` cell ships "y", and what deciding that cost.
+
+    Two groups get a "y". The top band by popularity, which is the sheet's whole ergonomic
+    argument — a reviewer should spend their attention on the boundary, not on confirming that
+    the French Revolution is famous. And every manual addition, unconditionally: those entries
+    exist *because* they are civilizational icons the harvest missed, and their popularity is a
+    placeholder that would rank them out of the band on a technicality.
+
+    Entity starts are skipped over rather than counted out: the band is filled to
+    `CURATION_PREFILLED_FAMOUS` from the ranked list with them removed, so excluding Playboy
+    promotes the next real event instead of shrinking the answer pool by one. They keep their
+    sheet row and their flag, and a curator who disagrees writes "y" — the read-back honours a
+    human "y" on any row, which is what keeps this a prefill rule and not a ban."""
     ranked = sorted(
         (event for event in events if event.review_candidate),
         key=lambda event: (-event.popularity, event.sort_key),
     )
-    top_band = {event.qid for event in ranked[:CURATION_PREFILLED_FAMOUS]}
-    return top_band | {event.qid for event in events if event.manual}
+    eligible = [
+        event
+        for event in ranked
+        if not any(flag in event.flags for flag in PREFILL_EXCLUDED_FLAGS)
+    ]
+    band = eligible[:CURATION_PREFILLED_FAMOUS]
+    cutoff = band[-1].popularity if band else 0
+    displaced = [
+        event
+        for event in ranked
+        if any(flag in event.flags for flag in PREFILL_EXCLUDED_FLAGS)
+        and event.popularity >= cutoff
+    ]
+
+    ids = {event.qid for event in band} | {event.qid for event in events if event.manual}
+    return PrefillBand(ids=ids, displaced=displaced, tail=band[-PREFILL_TAIL_SHOWN:])
 
 
 def apply_curation(
@@ -1511,13 +1745,18 @@ def apply_curation(
 ) -> tuple[list[AssembledEvent], CurationOutcome]:
     """The sheet's rulings written into the dataset, and an account of what they did.
 
-    Four things the sheet can say. A `notes` cell containing "drop" deletes the event from both
+    Five things the sheet can say. A `notes` cell containing "drop" deletes the event from both
     output files — the reviewer's verdict that it is not an event at all, and the only
     destructive column. `famous` decides answer-pool membership, prefill included: a "y" that no
     human touched still counts, which is what makes the pool a few hundred recognisable events
     on the first run instead of every item that cleared the sitelink bar. `category_final`
-    overrides the prefilled kind and sets `category_reviewed`. Anything else the sheet holds is
-    derived and gets regenerated.
+    overrides the prefilled kind and sets `category_reviewed`. `region_final` overrides the
+    region chain outright, for the events Wikidata simply has no location claim about. Anything
+    else the sheet holds is derived and gets regenerated.
+
+    Both override columns are validated here rather than at read time, and both raise naming
+    the row: a typo in a spreadsheet cell is the likeliest failure in this whole file, and a
+    region the game's feedback axis cannot compare would otherwise ship as a silent dead axis.
 
     Edits whose qid is no longer in the pool are reported rather than dropped in silence: it
     means the sheet and the dataset have diverged, which a curator needs to know before they
@@ -1528,6 +1767,8 @@ def apply_curation(
         famous_from_human=0,
         unfamous_from_human=0,
         categories_overridden=0,
+        regions_overridden=0,
+        regions_filled_from_null=0,
         edits_matched=0,
         edits_unmatched=[],
     )
@@ -1568,6 +1809,21 @@ def apply_curation(
             event.category_reviewed = True
             outcome.categories_overridden += 1
 
+        if edit is not None and edit.region_final:
+            if edit.region_final not in LEGAL_REGIONS:
+                raise RuntimeError(
+                    f"curation row {event.qid} ({event.name}) has region_final "
+                    f"{edit.region_final!r}; expected one of {list(LEGAL_REGIONS)}"
+                )
+            if event.region is None:
+                outcome.regions_filled_from_null += 1
+            event.region = edit.region_final
+            event.region_source = "curation sheet"
+            event.flags = [
+                flag for flag in event.flags if flag not in REGION_CHAIN_FLAGS
+            ]
+            outcome.regions_overridden += 1
+
         kept.append(event)
 
     return kept, outcome
@@ -1599,6 +1855,7 @@ def curation_rows(
                 "category_auto": event.category,
                 "tags_auto": ";".join(event.tags),
                 "region": event.region or "",
+                "region_final": edit.region_final if edit else "",
                 "country": event.country or "",
                 "popularity": event.popularity,
                 "flags": ";".join(event.flags),
@@ -1632,7 +1889,6 @@ def validate(events: list[AssembledEvent]) -> None:
     category the UI has no bucket for, an id with no name, half a coordinate pair, a duplicate
     id that would give the daily draw two different answers. Raises rather than asserts, so the
     checks survive an optimised interpreter and say what was expected."""
-    legal_regions = [*REGION_CANONICAL, REGION_MULTI]
     seen: set[str] = set()
     for event in events:
         if not isinstance(event.year, int) or isinstance(event.year, bool) or event.year == 0:
@@ -1640,10 +1896,10 @@ def validate(events: list[AssembledEvent]) -> None:
                 f"{event.qid} has year {event.year!r}; expected a non-zero int "
                 "(historian's years have no year 0)"
             )
-        if event.region is not None and event.region not in legal_regions:
+        if event.region is not None and event.region not in LEGAL_REGIONS:
             raise RuntimeError(
                 f"{event.qid} has region {event.region!r}; "
-                f"expected null or one of {legal_regions}"
+                f"expected null or one of {list(LEGAL_REGIONS)}"
             )
         if event.category not in CATEGORIES:
             raise RuntimeError(
@@ -1740,8 +1996,13 @@ def print_manual_merge(merge: ManualMerge) -> None:
     """What the hand-written draft added, and every entry the harvest already had. The skip list
     is printed in full rather than counted: each line is a claim that two differently-worded
     names are the same event, and that claim is only checkable by reading it."""
+    with_thumb = sum(1 for event in merge.merged if event.thumb)
     print("\n2. MANUAL ADDITIONS")
     print(f"  merged into the pool            {len(merge.merged):>6}")
+    share = percent(with_thumb, len(merge.merged))
+    print(f"  of those, with a thumbnail      {with_thumb:>6}  {share}")
+    if not MANUAL_THUMBS_PATH.is_file():
+        print(f"        (no {MANUAL_THUMBS_PATH.name} — run pipeline/thumbs.py to fill these)")
     print(f"  skipped as already harvested    {len(merge.skipped):>6}")
     for name, match in merge.skipped:
         print(f"        {name}  ->  {match}")
@@ -1800,6 +2061,7 @@ def print_regions(events: list[AssembledEvent]) -> None:
         "country table",
         "coordinate box",
         "manual draft",
+        "curation sheet",
         "unresolved",
     ):
         print(f"      {source:<28} {sources[source]:>6}  {percent(sources[source], total)}")
@@ -1822,10 +2084,33 @@ def print_curation(outcome: CurationOutcome, read_back: CurationReadBack, famous
     for line in outcome.dropped[:DROP_EXAMPLES_SHOWN]:
         print(f"        {line}")
     print(f"  categories overridden      {outcome.categories_overridden:>6}")
+    print(f"  regions overridden         {outcome.regions_overridden:>6}")
+    print(f"     of those, filled a null {outcome.regions_filled_from_null:>6}")
     print(f"  famous from prefill        {outcome.famous_from_prefill:>6}")
     print(f"  famous set by a human      {outcome.famous_from_human:>6}")
     print(f"  un-famoused by a human     {outcome.unfamous_from_human:>6}")
     print(f"  ANSWER POOL (famous)       {famous:>6}")
+
+
+def print_entity_starts(events: list[AssembledEvent], band: PrefillBand) -> None:
+    """What the entity-start rule caught and what it cost the prefill.
+
+    Three numbers and two lists, because the rule is a judgement about what an *answer* is and
+    the only way to check a judgement is to read the rows it moved. The displaced list is the
+    accusation — these are popular items that would have been prefilled as answers — and the
+    tail is the receipt: the least popular events now in the band, showing what got promoted in
+    their place and where the cutoff sits."""
+    flagged = [event for event in events if "entity_start" in event.flags]
+    total = len(events)
+    print("\n7. ENTITY STARTS (dated by inception, not occurrence)")
+    print(f"  flagged in the pool        {len(flagged):>6}  {percent(len(flagged), total)}")
+    print(f"  still guessable            {len(flagged):>6}  (the rule touches the prefill only)")
+    print(f"  displaced from the prefill {len(band.displaced):>6}")
+    for event in band.displaced[:ENTITY_START_EXAMPLES_SHOWN]:
+        print(f"      {event.popularity:>4}  {event.year:>6}  {event.name}")
+    print(f"  prefilled band tail (last {len(band.tail)} in, by popularity):")
+    for event in band.tail:
+        print(f"      {event.popularity:>4}  {event.year:>6}  {event.name}")
 
 
 def print_report(
@@ -1834,6 +2119,7 @@ def print_report(
     merge: ManualMerge,
     read_back: CurationReadBack,
     outcome: CurationOutcome,
+    band: PrefillBand,
     curation_row_count: int,
 ) -> None:
     """The acceptance evidence: what the filter did, what the draft added, how the survivors
@@ -1855,8 +2141,9 @@ def print_report(
     print_tags(events)
     print_regions(events)
     print_curation(outcome, read_back, len(famous))
+    print_entity_starts(events, band)
 
-    print("\n7. COVERAGE")
+    print("\n8. COVERAGE")
     for name, count in (
         ("thumbnail", sum(1 for event in events if event.thumb)),
         ("coordinates", sum(1 for event in events if event.lat is not None)),
@@ -1866,13 +2153,21 @@ def print_report(
     ):
         print(f"  {name:<24} {count:>6}  {percent(count, total)}")
 
-    print(f"\n8. ANSWER POOL — top {TOP_POPULARITY_SHOWN} by popularity")
+    print(f"\n9. ANSWER POOL — top {TOP_POPULARITY_SHOWN} by popularity")
     ranked = sorted(famous, key=lambda event: (-event.popularity, event.sort_key))
     for event in ranked[:TOP_POPULARITY_SHOWN]:
         print(f"      {event.popularity:>4}  {event.year:>6}  {event.name}  [{event.category}]")
 
-    print("\n9. FLAGS")
-    for flag in ("gap_review", "category_guess", "region_missing", "region_boxed", "manual"):
+    print("\n10. FLAGS")
+    for flag in (
+        "gap_review",
+        "category_guess",
+        "region_missing",
+        "region_boxed",
+        "entity_start",
+        "serial_event",
+        "manual",
+    ):
         print(f"  {flag:<24} {flags[flag]:>6}  {percent(flags[flag], total)}")
     print(
         f"  {'review_candidate':<24} "
@@ -1880,13 +2175,13 @@ def print_report(
         f"{percent(sum(1 for e in events if e.review_candidate), total)}"
     )
 
-    print("\n10. OUTPUT FILES")
+    print("\n11. OUTPUT FILES")
     for path in (CORE_PATH, LABELS_PATH, CURATION_PATH):
         raw, packed = file_sizes(path)
         print(f"  {path.name:<20} {raw / 1024:>8.1f} KB raw  {packed / 1024:>8.1f} KB gzipped")
     print(f"  curation.csv rows    {curation_row_count:>8} (excluding header)")
 
-    print("\n11. SAMPLES (core + label)")
+    print("\n12. SAMPLES (core + label)")
     for reason, event in sample_events(events):
         print(f"  [{reason}] {event.qid} — {event.name}")
         print(
@@ -1937,16 +2232,16 @@ def main() -> int:
     events = sorted([*harvested, *merge.merged], key=lambda event: event.sort_key)
 
     read_back = read_curation()
-    prefilled = prefilled_famous_ids(events)
-    events, outcome = apply_curation(events, read_back, prefilled)
+    band = prefill_band(events)
+    events, outcome = apply_curation(events, read_back, band.ids)
     validate(events)
 
-    rows = curation_rows(events, read_back, prefilled)
+    rows = curation_rows(events, read_back, band.ids)
     write_core(events)
     write_labels(events)
     write_curation(rows)
 
-    print_report(events, selection, merge, read_back, outcome, len(rows))
+    print_report(events, selection, merge, read_back, outcome, band, len(rows))
 
     if not events:
         print("ERROR: the pool came out empty; expected thousands of events.", file=sys.stderr)

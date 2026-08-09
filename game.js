@@ -52,7 +52,33 @@ export const YEAR_BUCKETS = [
 const GREEN_WITHIN_YEARS = 15;
 const YELLOW_WITHIN_YEARS = 100;
 
+/**
+ * Inside this many years the year cell prints the exact distance ("7y") instead of the
+ * band it falls in ("5–15y"). TUNABLE.
+ *
+ * Coarse at range, exact up close — a deliberate information schedule, not a leak. By
+ * the time a guess is within a decade the band has already confined the answer to a
+ * handful of years, so spending the last of the resolution buys a player the endgame
+ * they have effectively already won instead of a run of probes that only rediscover
+ * what the cell said. What it does not buy is the answer: the puzzle is naming the
+ * event that happened in that year, and handing over the year leaves that untouched —
+ * 1969 alone does not say moon landing rather than Woodstock.
+ *
+ * The exact label is a DISPLAY fact only. The band index behind it is unchanged, and
+ * the score still reads the band (see `scoreFor`), so shrinking or widening this window
+ * cannot move anybody's score.
+ */
+const EXACT_WITHIN_YEARS = 10;
+
 const bucketFor = (yearDelta) => YEAR_BUCKETS.find((bucket) => yearDelta <= bucket.max);
+
+/**
+ * What the year cell prints: the exact distance up close, the band's label otherwise.
+ * A delta of zero is not "0y" — it is the same year, which the band already says better
+ * than a count of nothing does.
+ */
+const yearLabelFor = (yearDelta, bucket) =>
+  yearDelta > 0 && yearDelta <= EXACT_WITHIN_YEARS ? `${yearDelta}y` : bucket.label;
 
 /** Direction is stated from the answer's point of view: "the answer is later than your guess". */
 const directionFor = (guessYear, answerYear) => {
@@ -121,22 +147,31 @@ const closenessFor = (yearDelta, regionMatch, categoryMatch) => {
  * @returns {{
  *   yearDirection: 'earlier'|'later'|'equal',
  *   yearBucket: string,
+ *   yearLabel: string,
  *   regionMatch: 'same'|'continent'|'different'|'unknown',
  *   categoryMatch: boolean,
  *   closeness: 'green'|'yellow'|'grey'
  * }}
- *   `yearDirection` points from the guess towards the answer; `yearBucket` is a label
- *   from `YEAR_BUCKETS`. Years are plain integers with negatives meaning BCE, so the
- *   arithmetic needs no era handling — note this makes the 1 BCE → 1 CE gap two years,
- *   which is the astronomical convention and fine at these band widths.
+ *   `yearDirection` points from the guess towards the answer. The year axis comes back
+ *   twice on purpose: `yearBucket` is always a `YEAR_BUCKETS` label and is what the
+ *   rules speak — the score keys off it — while `yearLabel` is what the cell prints,
+ *   identical to the band except within `EXACT_WITHIN_YEARS`, where it is the exact
+ *   distance. Keeping them apart is what lets the display get finer without the scoring
+ *   table growing a row per year.
+ *
+ *   Years are plain integers with negatives meaning BCE, so the arithmetic needs no era
+ *   handling — note this makes the 1 BCE → 1 CE gap two years, which is the
+ *   astronomical convention and fine at these band widths.
  */
 export const evaluateGuess = (guessEvent, answerEvent) => {
   const yearDelta = Math.abs(answerEvent.year - guessEvent.year);
+  const bucket = bucketFor(yearDelta);
   const regionMatch = compareRegions(guessEvent.region, answerEvent.region);
   const categoryMatch = guessEvent.category === answerEvent.category;
   return {
     yearDirection: directionFor(guessEvent.year, answerEvent.year),
-    yearBucket: bucketFor(yearDelta).label,
+    yearBucket: bucket.label,
+    yearLabel: yearLabelFor(yearDelta, bucket),
     regionMatch,
     categoryMatch,
     closeness: closenessFor(yearDelta, regionMatch, categoryMatch),
@@ -159,6 +194,12 @@ export const evaluateGuess = (guessEvent, answerEvent) => {
  * — a number is easy to binary-search against, and a score built from the raw year
  * delta (say) would hand over a decade of resolution the "40–100y" cell deliberately
  * withholds. Anything added here must pass the same test: is it on the row?
+ *
+ * The score reads `yearBucket`, the band, and not `yearLabel`, what the cell prints.
+ * Those differ within ten years, where the cell prints the exact distance — and the
+ * band is derivable from that number, so scoring off the band stays strictly inside
+ * what the row shows. Scoring off the *label* instead would need a base per year and
+ * would spread the exactness into a second channel for no gain.
  *
  * Weighting: time carries the score and the two categorical axes are small bonuses.
  * That is the game's own shape — the year band is the axis a player actually
