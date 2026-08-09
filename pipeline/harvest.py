@@ -2,7 +2,7 @@
 
 This is the first stage of the histle dataset pipeline: it turns 732 calendar-day API
 responses (366 days x two feed types) into `data/raw/candidates.json`, one record per
-distinct historical event, keyed by Wikidata QID. Everything downstream — the Wikidata
+distinct entity the feed links to, keyed by Wikidata QID. Everything downstream — the Wikidata
 enrichment join, the curation pass, the shipped `data/events.json` — reads that QID, so
 this stage's only real job is to produce a clean, honest, regenerable key set.
 
@@ -18,11 +18,17 @@ Gotchas worth knowing before editing:
 - The response's top-level key equals the requested feed type ("events" / "selected"),
   not a generic name; a payload missing that key is a shape change and raises rather
   than quietly yielding zero events.
-- `pages[0]` is treated as the canonical entity, per the feed's own ordering (the first
-  link is the one the blurb is about). It is not always the *event*: for "selected"
-  entries the lead link is often the person or country involved (a 2024 UK election
-  entry canonicalizes to Keir Starmer). That is a curation problem, not a harvest one —
-  this stage records what the feed says and lets the human pass fix it.
+- A blurb's `pages[]` is a link list, not a single subject, so every page in it becomes
+  its own candidate and `pages[0]` carries no special authority. It used to: the first
+  link was taken as the blurb's canonical entity, and that rule provably lost events.
+  The December 7 entry "World War II: Attack on Pearl Harbor: ..." leads with
+  World_War_II (Q362, the umbrella war) and puts Attack_on_Pearl_Harbor (Q52418, the
+  event the blurb is actually about) second, so Pearl Harbor, D-Day, the Normandy
+  landings, VE Day and the surrender of Japan were absent from the candidate set
+  entirely. Position survives only as `page_index` provenance and as the dedup tiebreak.
+  Sorting the events from the umbrellas and the bystanders (a 2024 UK election blurb
+  also links Keir Starmer) is not a job the feed can do: it needs Wikidata's P31 classes
+  and event dates, which the enrichment stage fetches, and a human pass after that.
 - `page["title"]` is the underscored URL form ("Keir_Starmer"). Kept as-is because it is
   the stable page key; `normalizedtitle` holds the display form if a later stage wants
   it, and the Wikidata join will supply proper labels anyway.
@@ -85,9 +91,12 @@ class FetchStats:
 
 @dataclass
 class MergeStats:
-    """Tally of what the merge pass saw, kept, and threw away — and why."""
+    """Tally of what the merge pass saw, kept, and threw away — and why. The pass counts
+    at two grains, because one blurb yields as many candidates as it has linked pages:
+    `raw_entries` is blurbs read, `page_sightings` is candidates emitted from them."""
 
     raw_entries: int = 0
+    page_sightings: int = 0
     dropped: Counter[str] = field(default_factory=Counter)
     duplicate_qids: int = 0
 
@@ -204,32 +213,53 @@ def entries_of(payload: dict[str, Any], feed: str, mm: str, dd: str) -> list[dic
     return entries
 
 
-def extract_record(entry: dict[str, Any], feed: str, mm: str, dd: str) -> dict[str, Any] | str:
-    """One entry reduced to the fields histle needs, or a drop-reason string if it
-    cannot be reduced. The canonical entity is `pages[0]` — the feed orders the blurb's
-    own subject first — and its QID is the record's identity."""
+@dataclass
+class BlurbExtraction:
+    """What one blurb yielded: its candidates, plus the drops that produced no candidate.
+    Three outcomes have to be reportable — the blurb was unusable, some of its pages were,
+    or all of it came through — so the result is a small record rather than a value with a
+    drop-reason string smuggled into its type."""
+
+    candidates: list[dict[str, Any]] = field(default_factory=list)
+    blurb_drop_reason: str | None = None
+    pages_without_qid: int = 0
+
+
+def extract_candidates(entry: dict[str, Any], feed: str, mm: str, dd: str) -> BlurbExtraction:
+    """Every page the blurb links, reduced to the fields histle needs — one candidate per
+    page, since the feed's link list has no canonical first element (see the module
+    docstring's Pearl Harbor case). The blurb's year, text and provenance date are copied
+    onto each candidate; the page contributes the identity (its QID), its title, and its
+    0-based `page_index`, which records how central the blurb treated it. A page with no
+    `wikibase_item` cannot be joined to Wikidata and is counted rather than kept; a blurb
+    with no year cannot be dated at all and takes its whole page list down with it."""
     year = entry.get("year")
     if year is None:
-        return "no_year"
+        return BlurbExtraction(blurb_drop_reason="no_year")
 
     pages = entry.get("pages") or []
     if not pages:
-        return "no_pages"
+        return BlurbExtraction(blurb_drop_reason="no_pages")
 
-    page = pages[0]
-    qid = page.get("wikibase_item")
-    if not qid:
-        return "no_wikibase_item"
-
-    return {
-        "qid": qid,
-        "title": page.get("title") or "",
-        "year": year,
-        "text": entry.get("text") or "",
-        "selected": feed == "selected",
-        "month": mm,
-        "day": dd,
-    }
+    extraction = BlurbExtraction()
+    for page_index, page in enumerate(pages):
+        qid = page.get("wikibase_item")
+        if not qid:
+            extraction.pages_without_qid += 1
+            continue
+        extraction.candidates.append(
+            {
+                "qid": qid,
+                "title": page.get("title") or "",
+                "year": year,
+                "text": entry.get("text") or "",
+                "selected": feed == "selected",
+                "month": mm,
+                "day": dd,
+                "page_index": page_index,
+            }
+        )
+    return extraction
 
 
 def validation_error(record: dict[str, Any]) -> str | None:
@@ -246,11 +276,22 @@ def validation_error(record: dict[str, Any]) -> str | None:
     return None
 
 
+def more_central(existing: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:
+    """Of two sightings of the same entity, the one whose blurb was most about it. The
+    lower `page_index` wins: a page the feed lists first is nearer that blurb's subject
+    than one it lists sixth, so Pearl Harbor keeps the December 7 blurb it heads rather
+    than a later blurb that merely mentions it. Ties keep `existing`, which is the earlier
+    calendar occurrence because the merge walks the year in order."""
+    return candidate if candidate["page_index"] < existing["page_index"] else existing
+
+
 def merge_candidates() -> tuple[list[dict[str, Any]], MergeStats]:
-    """Read every saved day and fold it into one record per QID. First sighting wins for
-    text, title and provenance date; the selected flag is sticky, so a QID seen in any
-    "selected" feed stays flagged however many plain "events" sightings follow. Pure
-    apart from reading the cache directory — no network, no writes."""
+    """Read every saved day and fold every linked page of every blurb into one record per
+    QID. Where an entity is sighted more than once, the sighting whose blurb treated it as
+    most central wins its text, title and provenance date; the selected flag is sticky
+    across all of them, so a QID seen in any "selected" feed stays flagged however many
+    plain "events" sightings follow. Pure apart from reading the cache directory — no
+    network, no writes."""
     stats = MergeStats()
     by_qid: dict[str, dict[str, Any]] = {}
 
@@ -262,23 +303,30 @@ def merge_candidates() -> tuple[list[dict[str, Any]], MergeStats]:
 
             for entry in entries_of(payload, feed, mm, dd):
                 stats.raw_entries += 1
-                extracted = extract_record(entry, feed, mm, dd)
-                if isinstance(extracted, str):
-                    stats.dropped[extracted] += 1
+                extraction = extract_candidates(entry, feed, mm, dd)
+                if extraction.blurb_drop_reason:
+                    stats.dropped[extraction.blurb_drop_reason] += 1
                     continue
+                if extraction.pages_without_qid:
+                    stats.dropped["no_wikibase_item"] += extraction.pages_without_qid
 
-                reason = validation_error(extracted)
-                if reason:
-                    stats.dropped[reason] += 1
-                    continue
+                for candidate in extraction.candidates:
+                    stats.page_sightings += 1
 
-                existing = by_qid.get(extracted["qid"])
-                if existing is None:
-                    by_qid[extracted["qid"]] = extracted
-                    continue
+                    reason = validation_error(candidate)
+                    if reason:
+                        stats.dropped[reason] += 1
+                        continue
 
-                stats.duplicate_qids += 1
-                existing["selected"] = existing["selected"] or extracted["selected"]
+                    existing = by_qid.get(candidate["qid"])
+                    if existing is None:
+                        by_qid[candidate["qid"]] = candidate
+                        continue
+
+                    stats.duplicate_qids += 1
+                    kept = more_central(existing, candidate)
+                    kept["selected"] = existing["selected"] or candidate["selected"]
+                    by_qid[candidate["qid"]] = kept
 
     return list(by_qid.values()), stats
 
@@ -303,6 +351,7 @@ def write_candidates(records: list[dict[str, Any]], fetch: FetchStats, merge: Me
             "resumed_from_cache": fetch.resumed,
             "failed_days": len(fetch.failed_days),
             "raw_entries": merge.raw_entries,
+            "page_sightings": merge.page_sightings,
             "dropped_total": merge.total_dropped,
             "dropped_by_reason": dict(merge.dropped),
             "duplicate_qid_sightings": merge.duplicate_qids,
@@ -363,7 +412,8 @@ def print_report(records: list[dict[str, Any]], fetch: FetchStats, merge: MergeS
         print(f"      - {label}")
 
     print("\nMERGE")
-    print(f"  raw event entries  : {merge.raw_entries}")
+    print(f"  raw blurbs read    : {merge.raw_entries}")
+    print(f"  page sightings     : {merge.page_sightings}")
     print(f"  dropped            : {merge.total_dropped}")
     for reason, count in sorted(merge.dropped.items(), key=lambda item: -item[1]):
         print(f"      {reason:<20} {count}")
@@ -388,7 +438,7 @@ def print_report(records: list[dict[str, Any]], fetch: FetchStats, merge: MergeS
         if len(text) > 110:
             text = text[:107] + "..."
         print(f"  [{flag}] {record['qid']:<12} {record['year']:>6}  {record['title']}")
-        print(f"             {record['month']}-{record['day']}  {text}")
+        print(f"             {record['month']}-{record['day']}  page {record['page_index']}  {text}")
 
     print(f"\nWROTE {CANDIDATES_PATH}")
     print("=" * 72, flush=True)

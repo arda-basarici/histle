@@ -7,10 +7,12 @@ event date (P585 point in time, falling back to P580 start time), the countries 
 happened in and their continents, English aliases, sitelink count, and the instance-of
 (P31) classes.
 
-Why this stage exists. The harvest canonicalizes each "On This Day" blurb to `pages[0]`,
-and that page is frequently not the event: it is Bach, or NASA, or "4th millennium BC",
-or "Kali Yuga". Roughly a third of the candidate set is an umbrella entity of that kind.
-Nothing in the feed distinguishes them, so the fix has to come from the items themselves.
+Why this stage exists. The harvest emits one candidate per page linked from an "On This
+Day" blurb, and most of those pages are not the event: they are Bach, or NASA, or "4th
+millennium BC", or "Kali Yuga" — the people, places and umbrellas a blurb name-checks
+while describing something that happened. Nothing in the feed distinguishes them from the
+event itself, and position in the link list does not either, so the fix has to come from
+the items themselves.
 The two fields that carry the signal are P31 (a person is `instance of: human`, an event
 is `instance of: battle / treaty / disaster`) and the presence of an event date at all
 (entities that merely *participated* in history usually have neither P585 nor P580).
