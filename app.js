@@ -8,11 +8,13 @@
  *
  * The board is never the source of truth. Guesses are held as event ids and every
  * rendered row is derived from (id, answer) through `evaluateGuess` — which is why a
- * reload can restore a half-played day from ids alone.
+ * reload can restore a half-played day from ids alone. The two things a reload cannot
+ * re-derive are the hints bought and whether the player quit, so those are the only
+ * extra facts the saved board carries.
  */
 
 import { buildSearchIndex, searchEvents } from './matcher.js';
-import { MAX_GUESSES, evaluateGuess } from './game.js';
+import { HINTS, effectiveGuessCount, evaluateGuess, scoreFor } from './game.js';
 import { answerForDay, dayNumberFor } from './daily.js';
 import { buildShareText } from './share.js';
 import { emptyStats, loadBoard, loadStats, saveBoard, saveStats, withResult } from './storage.js';
@@ -28,10 +30,25 @@ const REGION_CELL = {
   unknown: { symbol: '?', title: 'One of the two events has no region recorded' },
 };
 
+/**
+ * What a guess spanning continents shows instead of the unknown "?".
+ *
+ * `evaluateGuess` collapses "no region recorded" and "region is multi" into the same
+ * verdict, because neither can match a continent. On the board they must not read the
+ * same: "?" says the dataset failed, and a player who guessed the Second World War
+ * deserves to be told that the answer to *that* axis is "everywhere", not that we lost
+ * the record. Same cell state, so the colour and the share grid are unaffected.
+ */
+const REGION_MULTI = 'multi';
+const REGION_MULTI_CELL = {
+  symbol: '🌐',
+  title: 'Your guess spans continents, so the region axis gives no signal',
+};
+
 /** Wording tracks the thresholds in `game.js`; change both together. */
 const CLOSENESS_CELL = {
   green: { text: 'Close', title: 'Near in time, and the region or the kind matches' },
-  yellow: { text: 'Warm', title: 'Within a few centuries, or the region and kind both match' },
+  yellow: { text: 'Warm', title: 'Within a century, or the region and kind both match' },
   grey: { text: 'Cold', title: 'Far in time, with neither region nor kind matching' },
 };
 
@@ -46,6 +63,8 @@ const el = {
   suggestions: document.getElementById('suggestions'),
   status: document.getElementById('guess-status'),
   counter: document.getElementById('guess-counter'),
+  assist: document.getElementById('assist'),
+  hintPanel: document.getElementById('hint-panel'),
   outcome: document.getElementById('outcome'),
   guessList: document.getElementById('guess-list'),
   dayNumber: document.getElementById('day-number'),
@@ -59,10 +78,15 @@ const state = {
   dayNumber: 0,
   answer: null,
   guesses: [],
+  hintsUsed: 0,
+  gaveUp: false,
   stats: emptyStats(),
   suggestions: [],
   activeIndex: -1,
 };
+
+/** The number the board, the stats and the share text all report. */
+const effectiveCount = () => effectiveGuessCount(state.guesses.length, state.hintsUsed);
 
 // ---------------------------------------------------------------- pure helpers
 
@@ -76,13 +100,18 @@ const ordinal = (n) => {
 };
 
 /**
- * "1789 → 18th c.", "-490 → 5th c. BC". The century a year belongs to counts from 1,
- * so 1800 is still the 18th century and 1801 opens the 19th.
+ * The century a year belongs to, counting from 1 — so 1800 is still the 18th century
+ * and 1801 opens the 19th.
  */
-const centuryTag = (year) => {
-  const century = Math.floor((Math.abs(year) - 1) / 100) + 1;
-  return year < 0 ? `${ordinal(century)} c. BC` : `${ordinal(century)} c.`;
-};
+const centuryOf = (year) => Math.floor((Math.abs(year) - 1) / 100) + 1;
+
+/** "1789 → 18th c.", "-490 → 5th c. BC" — the abbreviated form the tight suggestion rows use. */
+const centuryTag = (year) =>
+  year < 0 ? `${ordinal(centuryOf(year))} c. BC` : `${ordinal(centuryOf(year))} c.`;
+
+/** "1789 → 18th century", "-490 → 5th century BC" — spelled out, for the hint panel. */
+const centuryName = (year) =>
+  `${ordinal(centuryOf(year))} century${year < 0 ? ' BC' : ''}`;
 
 const debounce = (fn, delayMs) => {
   let timer;
@@ -139,7 +168,8 @@ const buildCell = (label, value, { state: cellState, title } = {}) => {
 
 const buildFeedbackCells = (feedback, guessEvent) => {
   const arrow = DIRECTION_ARROW[feedback.yearDirection];
-  const region = REGION_CELL[feedback.regionMatch];
+  const region =
+    guessEvent.region === REGION_MULTI ? REGION_MULTI_CELL : REGION_CELL[feedback.regionMatch];
   const closeness = CLOSENESS_CELL[feedback.closeness];
   const cells = element('div', 'cells');
   cells.append(
@@ -177,7 +207,17 @@ const buildGuessRow = ({ event, name, feedback, isAnswer }) => {
   // seeing where the earlier probes landed.
   heading.append(element('span', 'guess__year', ` · ${formatYear(event.year)}`));
   if (isAnswer) heading.append(element('span', 'guess__badge', 'solved'));
-  body.append(heading, buildFeedbackCells(feedback, event));
+
+  // The score is a summary of the four cells below it and adds nothing to them (see
+  // SCORING's leak-safety note) — it sits on the row so a player can rank their probes
+  // at a glance instead of comparing four axes by eye.
+  const score = scoreFor(feedback, { isAnswer });
+  const scoreNode = element('span', 'guess__score', String(score));
+  scoreNode.title = `${score} out of 100 — how close this guess was`;
+
+  const head = element('div', 'guess__head');
+  head.append(heading, scoreNode);
+  body.append(head, buildFeedbackCells(feedback, event));
 
   row.append(buildThumb(event, name), body);
   return row;
@@ -298,12 +338,21 @@ const setStatus = (message) => {
   el.status.textContent = message;
 };
 
+/**
+ * The counter counts UP and counts everything.
+ *
+ * There is no budget left to report, so the number on display is the one the player is
+ * accumulating — and it includes what hints cost, which is what makes a hint feel like
+ * a purchase at the moment of buying: the count visibly jumps by two.
+ */
 const updateCounter = () => {
-  const left = MAX_GUESSES - state.guesses.length;
+  const spent = effectiveCount();
+  if (state.status === 'playing') {
+    el.counter.textContent = `Guess ${spent + 1}`;
+    return;
+  }
   el.counter.textContent =
-    state.status === 'playing'
-      ? `${left} guess${left === 1 ? '' : 'es'} left`
-      : `${state.guesses.length} of ${MAX_GUESSES} used`;
+    state.status === 'won' ? `Solved in ${spent}` : `Gave up — ${spent} spent`;
 };
 
 const lockInput = () => {
@@ -311,6 +360,92 @@ const lockInput = () => {
   el.input.value = '';
   el.input.placeholder = 'Come back tomorrow';
   closeSuggestions();
+};
+
+// ------------------------------------------------------------- hints + give up
+
+const HINT_LABEL = { kind: 'Kind', region: 'Region', century: 'Century' };
+
+/**
+ * What each hint discloses about the answer, in `HINTS.order`.
+ *
+ * Region is stated honestly rather than hidden behind the board's "no signal" verdict:
+ * `evaluateGuess` cannot compare 'multi' to a continent, but a player who has PAID for
+ * the region has bought the fact, and "it spans continents" is that fact. Selling them
+ * a shrug would be the worst of both — cost incurred, nothing learned.
+ */
+const HINT_VALUE = {
+  kind: (answer) => answer.category,
+  region: (answer) => {
+    if (!answer.region) return 'not recorded for this event';
+    return answer.region === REGION_MULTI ? 'multi — it spans continents' : answer.region;
+  },
+  century: (answer) => centuryName(answer.year),
+};
+
+const renderHints = () => {
+  const revealed = HINTS.order.slice(0, state.hintsUsed);
+  el.hintPanel.hidden = revealed.length === 0;
+  el.hintPanel.replaceChildren(
+    ...revealed.flatMap((hint) => [
+      element('dt', null, HINT_LABEL[hint]),
+      element('dd', null, HINT_VALUE[hint](state.answer)),
+    ]),
+  );
+};
+
+const buildHintButton = () => {
+  const button = element(
+    'button',
+    'assist__hint',
+    `Hint ${state.hintsUsed + 1} of ${HINTS.max} — costs ${HINTS.costInGuesses} guesses`,
+  );
+  button.type = 'button';
+  button.addEventListener('click', takeHint);
+  return button;
+};
+
+/**
+ * Giving up is the one irreversible click on the page — the day cannot be replayed and
+ * the streak is gone — so it asks twice. The confirmation lives in the button's own
+ * label rather than a dialog: a modal for a quiet link would make the exit louder than
+ * the game.
+ */
+const GIVE_UP_CONFIRM_MS = 4000;
+
+const buildGiveUpButton = () => {
+  const button = element('button', 'assist__giveup', 'Give up');
+  button.type = 'button';
+  let armed = false;
+  let disarm;
+  button.addEventListener('click', () => {
+    if (armed) {
+      clearTimeout(disarm);
+      giveUp();
+      return;
+    }
+    armed = true;
+    button.textContent = 'Click again to give up';
+    disarm = setTimeout(() => {
+      armed = false;
+      button.textContent = 'Give up';
+    }, GIVE_UP_CONFIRM_MS);
+  });
+  return button;
+};
+
+/** Hints unlock on effort spent, not on hints remaining, so give up stays available after the third. */
+const renderAssist = () => {
+  const unlocked = state.status === 'playing' && state.guesses.length >= HINTS.unlockAfter;
+  el.assist.hidden = !unlocked;
+  if (!unlocked) {
+    el.assist.replaceChildren();
+    return;
+  }
+  el.assist.replaceChildren(
+    ...(state.hintsUsed < HINTS.max ? [buildHintButton()] : []),
+    buildGiveUpButton(),
+  );
 };
 
 // ------------------------------------------------------------------- end state
@@ -374,7 +509,7 @@ const buildShareButton = () => {
       dayNumber: state.dayNumber,
       feedbacks: state.guesses.map((guess) => guess.feedback),
       won: state.status === 'won',
-      maxGuesses: MAX_GUESSES,
+      hintsUsed: state.hintsUsed,
     });
     const copied = await copyToClipboard(text);
     button.textContent = copied ? 'Copied!' : 'Copy failed';
@@ -385,23 +520,30 @@ const buildShareButton = () => {
   return button;
 };
 
+/** Spells out what the count was made of, so a hinted solve does not look like a pure one. */
+const solveLine = () => {
+  const spent = effectiveCount();
+  const breakdown =
+    state.hintsUsed === 0
+      ? ''
+      : ` (${state.guesses.length} guess${state.guesses.length === 1 ? '' : 'es'} + ${
+          state.hintsUsed
+        } hint${state.hintsUsed === 1 ? '' : 's'})`;
+  return `${nameOf(state.answer.id)} — ${formatYear(state.answer.year)}, in ${spent}${breakdown}.`;
+};
+
 const showWin = () => {
   el.outcome.hidden = false;
   el.outcome.className = 'outcome outcome--win';
   el.outcome.replaceChildren(
     element('h2', 'outcome__title', 'Solved!'),
-    element(
-      'p',
-      'outcome__line',
-      `${nameOf(state.answer.id)} — ${formatYear(state.answer.year)}, in ${
-        state.guesses.length
-      } guess${state.guesses.length === 1 ? '' : 'es'}.`,
-    ),
+    element('p', 'outcome__line', solveLine()),
     buildStatsLine(),
     buildShareButton(),
   );
 };
 
+/** The only loss left is giving up — running out of guesses is no longer possible. */
 const showLoss = () => {
   const name = nameOf(state.answer.id);
   el.outcome.hidden = false;
@@ -419,7 +561,7 @@ const showLoss = () => {
   reveal.append(text);
 
   el.outcome.replaceChildren(
-    element('h2', 'outcome__title', 'Out of guesses — the answer was:'),
+    element('h2', 'outcome__title', 'Gave up — the answer was:'),
     reveal,
     buildStatsLine(),
     buildShareButton(),
@@ -443,10 +585,10 @@ const appendGuess = (guessEvent) => {
   );
 };
 
-/** 'playing' until the last guess is the answer or the six are spent. */
+/** 'playing' until the answer is guessed or the player quits — there is no third exit. */
 const outcomeOf = (guesses) => {
   if (guesses.at(-1)?.id === state.answer.id) return 'won';
-  return guesses.length >= MAX_GUESSES ? 'lost' : 'playing';
+  return state.gaveUp ? 'lost' : 'playing';
 };
 
 /**
@@ -459,20 +601,23 @@ const outcomeOf = (guesses) => {
  */
 const settle = () => {
   state.status = outcomeOf(state.guesses);
+  renderHints();
   if (state.status === 'playing') {
     updateCounter();
+    renderAssist();
     return;
   }
   const updated = withResult(state.stats, {
-    dayNumber: state.dayNumber,
+    day: state.dayNumber,
     won: state.status === 'won',
-    guessCount: state.guesses.length,
+    effectiveCount: effectiveCount(),
   });
   if (updated !== state.stats) {
     state.stats = updated;
     saveStats(updated);
   }
   lockInput();
+  renderAssist();
   if (state.status === 'won') showWin();
   else showLoss();
   updateCounter();
@@ -480,11 +625,33 @@ const settle = () => {
 
 const persistBoard = () => {
   saveBoard({
-    dayNumber: state.dayNumber,
+    day: state.dayNumber,
     guessIds: state.guesses.map((guess) => guess.id),
+    hintsUsed: state.hintsUsed,
+    gaveUp: state.gaveUp,
     finished: state.status !== 'playing',
     won: state.status === 'won',
   });
+};
+
+const takeHint = () => {
+  if (state.status !== 'playing' || state.hintsUsed >= HINTS.max) return;
+  state.hintsUsed += 1;
+  setStatus(
+    `Hint bought — it cost you ${HINTS.costInGuesses} guesses. ${
+      HINTS.max - state.hintsUsed
+    } left.`,
+  );
+  settle(); // repaints the panel, the counter and the button; the game stays in play
+  persistBoard();
+};
+
+const giveUp = () => {
+  if (state.status !== 'playing') return;
+  state.gaveUp = true;
+  setStatus('');
+  settle();
+  persistBoard();
 };
 
 const submitGuess = (eventId) => {
@@ -551,6 +718,8 @@ const loadData = async () => {
 const restoreBoard = () => {
   const saved = loadBoard(state.dayNumber);
   if (!saved) return;
+  state.hintsUsed = saved.hintsUsed;
+  state.gaveUp = saved.gaveUp;
   for (const id of saved.guessIds) {
     const guessEvent = state.eventsById.get(id);
     if (guessEvent) appendGuess(guessEvent);

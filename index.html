@@ -22,6 +22,10 @@
       <!-- Guessing area. The combobox is the only way to enter a guess: free text is
            deliberately not accepted, so every guess resolves to a known event id. -->
       <section class="guessbox" aria-label="Make a guess">
+        <!-- Bought hints, pinned above the input so they stay in view however long the
+             guess history grows. Empty (and hidden) until the first hint is taken. -->
+        <dl id="hint-panel" class="hints" aria-label="Hints you have used" hidden></dl>
+
         <div class="guessbox__field">
           <label class="guessbox__label" for="guess-input">Your guess</label>
           <input
@@ -40,7 +44,12 @@
           <ul id="suggestions" class="suggestions" role="listbox" aria-label="Matching events" hidden></ul>
         </div>
         <p id="guess-status" class="guessbox__status" role="status" aria-live="polite"></p>
-        <p id="guess-counter" class="guessbox__counter"></p>
+
+        <div class="guessbox__meter">
+          <p id="guess-counter" class="guessbox__counter"></p>
+          <!-- Hint + give up. Hidden until the unlock threshold; populated by app.js. -->
+          <div id="assist" class="assist" hidden></div>
+        </div>
       </section>
 
       <!-- Outcome panel: win banner, or the reveal on a loss. Empty while playing. -->
@@ -61,8 +70,14 @@
         <dd>Region and category: match, near, miss, unknown.</dd>
         <dt>Border</dt>
         <dd>Overall closeness — green, amber, grey.</dd>
+        <dt>0–100</dt>
+        <dd>How close that guess was, read off the four cells beside it — 100 only for the answer.</dd>
       </dl>
-      <p class="legend__note">Six guesses. Pick every guess from the suggestion list.</p>
+      <p class="legend__note">
+        Guess as many times as you like — your guess count is the score. After six
+        guesses you can buy a hint; each one costs two guesses. Pick every guess from
+        the suggestion list.
+      </p>
     </footer>
 
   </div>
