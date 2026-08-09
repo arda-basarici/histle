@@ -1,6 +1,335 @@
 {
  "lang": "en",
  "labels": {
+  "M001": {
+   "name": "invention of the printing press",
+   "aliases": [
+    "Gutenberg press",
+    "Gutenberg invents printing",
+    "movable type printing"
+   ],
+   "blurb": ""
+  },
+  "M002": {
+   "name": "first powered flight",
+   "aliases": [
+    "Wright brothers first flight",
+    "Kitty Hawk flight"
+   ],
+   "blurb": ""
+  },
+  "M003": {
+   "name": "invention of the telephone",
+   "aliases": [
+    "Bell invents the telephone",
+    "first telephone call"
+   ],
+   "blurb": ""
+  },
+  "M004": {
+   "name": "invention of the practical light bulb",
+   "aliases": [
+    "Edison light bulb"
+   ],
+   "blurb": ""
+  },
+  "M005": {
+   "name": "discovery of penicillin",
+   "aliases": [
+    "Fleming discovers penicillin"
+   ],
+   "blurb": ""
+  },
+  "M006": {
+   "name": "discovery of the structure of DNA",
+   "aliases": [
+    "Watson and Crick DNA",
+    "double helix discovery"
+   ],
+   "blurb": ""
+  },
+  "M007": {
+   "name": "publication of On the Origin of Species",
+   "aliases": [
+    "Darwin publishes evolution",
+    "theory of evolution published"
+   ],
+   "blurb": ""
+  },
+  "M008": {
+   "name": "publication of Newton's Principia",
+   "aliases": [
+    "Newton's laws published",
+    "Principia Mathematica"
+   ],
+   "blurb": ""
+  },
+  "M009": {
+   "name": "Galileo's first telescope observations",
+   "aliases": [
+    "Galileo discovers Jupiter's moons",
+    "Sidereus Nuncius"
+   ],
+   "blurb": ""
+  },
+  "M010": {
+   "name": "Copernicus publishes the heliocentric model",
+   "aliases": [
+    "heliocentric theory published",
+    "Copernican revolution"
+   ],
+   "blurb": ""
+  },
+  "M011": {
+   "name": "Einstein publishes general relativity",
+   "aliases": [
+    "theory of relativity"
+   ],
+   "blurb": ""
+  },
+  "M012": {
+   "name": "first smallpox vaccination",
+   "aliases": [
+    "Jenner's vaccine",
+    "first vaccine"
+   ],
+   "blurb": ""
+  },
+  "M013": {
+   "name": "discovery of X-rays",
+   "aliases": [
+    "Röntgen discovers X-rays",
+    "Rontgen X-rays"
+   ],
+   "blurb": ""
+  },
+  "M014": {
+   "name": "discovery of radium",
+   "aliases": [
+    "Curie discovers radium",
+    "discovery of radioactivity elements"
+   ],
+   "blurb": ""
+  },
+  "M015": {
+   "name": "first human heart transplant",
+   "aliases": [
+    "Barnard heart transplant"
+   ],
+   "blurb": ""
+  },
+  "M016": {
+   "name": "invention of the World Wide Web",
+   "aliases": [
+    "Berners-Lee invents the web",
+    "birth of the web"
+   ],
+   "blurb": ""
+  },
+  "M017": {
+   "name": "Watt's improved steam engine",
+   "aliases": [
+    "invention of the steam engine",
+    "steam engine patent"
+   ],
+   "blurb": ""
+  },
+  "M018": {
+   "name": "first telegraph message",
+   "aliases": [
+    "What hath God wrought",
+    "Morse telegraph"
+   ],
+   "blurb": ""
+  },
+  "M019": {
+   "name": "cloning of Dolly the sheep",
+   "aliases": [
+    "first cloned mammal"
+   ],
+   "blurb": ""
+  },
+  "M020": {
+   "name": "first test-tube baby born",
+   "aliases": [
+    "first IVF birth"
+   ],
+   "blurb": ""
+  },
+  "M021": {
+   "name": "completion of the Human Genome Project",
+   "aliases": [
+    "human genome sequenced"
+   ],
+   "blurb": ""
+  },
+  "M022": {
+   "name": "first voyage of Columbus",
+   "aliases": [
+    "Columbus reaches America",
+    "discovery of America",
+    "Columbus discovers the New World"
+   ],
+   "blurb": ""
+  },
+  "M025": {
+   "name": "first ascent of Mount Everest",
+   "aliases": [
+    "Hillary and Norgay summit Everest",
+    "Everest first climbed"
+   ],
+   "blurb": ""
+  },
+  "M026": {
+   "name": "Amundsen reaches the South Pole",
+   "aliases": [
+    "first to the South Pole"
+   ],
+   "blurb": ""
+  },
+  "M027": {
+   "name": "discovery of Tutankhamun's tomb",
+   "aliases": [
+    "King Tut's tomb found",
+    "Carter opens Tutankhamun's tomb"
+   ],
+   "blurb": ""
+  },
+  "M028": {
+   "name": "sealing of Magna Carta",
+   "aliases": [
+    "Magna Carta signed",
+    "Great Charter"
+   ],
+   "blurb": ""
+  },
+  "M030": {
+   "name": "signing of the US Constitution",
+   "aliases": [
+    "US Constitution adopted"
+   ],
+   "blurb": ""
+  },
+  "M032": {
+   "name": "Universal Declaration of Human Rights adopted",
+   "aliases": [
+    "UDHR adopted"
+   ],
+   "blurb": ""
+  },
+  "M033": {
+   "name": "abolition of slavery in the British Empire",
+   "aliases": [
+    "Slavery Abolition Act"
+   ],
+   "blurb": ""
+  },
+  "M034": {
+   "name": "Code of Hammurabi proclaimed",
+   "aliases": [
+    "Hammurabi's code",
+    "first written law code"
+   ],
+   "blurb": ""
+  },
+  "M035": {
+   "name": "Edict of Milan",
+   "aliases": [
+    "Christianity legalized in Rome"
+   ],
+   "blurb": ""
+  },
+  "M036": {
+   "name": "crucifixion of Jesus",
+   "aliases": [
+    "Jesus crucified",
+    "the Crucifixion"
+   ],
+   "blurb": ""
+  },
+  "M038": {
+   "name": "Luther posts the Ninety-five Theses",
+   "aliases": [
+    "95 Theses",
+    "start of the Reformation"
+   ],
+   "blurb": ""
+  },
+  "M039": {
+   "name": "completion of the Sistine Chapel ceiling",
+   "aliases": [
+    "Michelangelo finishes the Sistine Chapel"
+   ],
+   "blurb": ""
+  },
+  "M040": {
+   "name": "premiere of Beethoven's Ninth Symphony",
+   "aliases": [
+    "Ode to Joy premiere"
+   ],
+   "blurb": ""
+  },
+  "M041": {
+   "name": "first photograph",
+   "aliases": [
+    "Niépce photograph",
+    "oldest surviving photograph"
+   ],
+   "blurb": ""
+  },
+  "M042": {
+   "name": "first public film screening by the Lumière brothers",
+   "aliases": [
+    "birth of cinema",
+    "Lumiere brothers screening"
+   ],
+   "blurb": ""
+  },
+  "M043": {
+   "name": "first transatlantic radio transmission",
+   "aliases": [
+    "Marconi radio signal"
+   ],
+   "blurb": ""
+  },
+  "M044": {
+   "name": "completion of the Great Pyramid of Giza",
+   "aliases": [
+    "Great Pyramid built",
+    "Pyramid of Khufu",
+    "pyramids of Egypt built"
+   ],
+   "blurb": ""
+  },
+  "M045": {
+   "name": "opening of the Colosseum",
+   "aliases": [
+    "Colosseum inaugurated"
+   ],
+   "blurb": ""
+  },
+  "M046": {
+   "name": "completion of Hagia Sophia",
+   "aliases": [
+    "Hagia Sophia built",
+    "Ayasofya completed"
+   ],
+   "blurb": ""
+  },
+  "M048": {
+   "name": "opening of the Suez Canal",
+   "aliases": [
+    "Suez Canal opens"
+   ],
+   "blurb": ""
+  },
+  "M049": {
+   "name": "completion of the Eiffel Tower",
+   "aliases": [
+    "Eiffel Tower opens"
+   ],
+   "blurb": ""
+  },
   "Q171": {
    "name": "wiki",
    "aliases": [
